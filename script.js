@@ -4,7 +4,7 @@ Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOi
 async function loadCesiumData() {
     try {
         // Load DTM (Digital Terrain Model) data using Ion Asset ID
-        const terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(2663518);
+        const terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(2675737);
 
         // Initialize the Cesium Viewer with the terrain provider
         const viewer = new Cesium.Viewer("cesiumContainer", {
