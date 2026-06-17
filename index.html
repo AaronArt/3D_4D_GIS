@@ -1,59 +1,1047 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>3D/4D GIS Visualization</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geovisor 3D/4D — Manizales & Nevado del Ruiz</title>
+
+    <!-- CesiumJS -->
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Cesium.js"></script>
     <link href="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
     <style>
-        .demo-container {
-            background-color: #303336;
-            border-radius: 5px;
-            padding: 5px;
-            margin: 5px 3px;
-            color: white;
+        :root {
+            --bg-0: #070a10;
+            --bg-1: rgba(13, 17, 25, 0.72);
+            --bg-2: rgba(20, 26, 38, 0.78);
+            --border: rgba(255, 255, 255, 0.07);
+            --border-strong: rgba(255, 255, 255, 0.16);
+            --text: #eef2f7;
+            --text-dim: #8b95a7;
+            --accent: #ff6b35;       /* lava orange */
+            --accent-2: #ffb627;     /* ember yellow */
+            --accent-3: #4cc9f0;     /* ice cyan */
+            --danger: #ef476f;
+            --success: #06d6a0;
+            --shadow: 0 18px 50px -12px rgba(0, 0, 0, 0.65);
+            --glass-sheen: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 38%);
+            --radius: 16px;
+            --radius-sm: 10px;
         }
-        .demo-container input {
-            vertical-align: middle;
-            margin-top: 0;
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-0);
+            color: var(--text);
+            font-size: 14px;
         }
-        #toolbar {
+
+        #cesiumContainer {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1;
-            padding: 10px;
-            background: rgba(42, 42, 42, 0.8);
-            border-radius: 5px;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Hide default Cesium toolbar/credit clutter visually (keep accessible) */
+        .cesium-viewer-toolbar { top: 16px; right: 16px; }
+        .cesium-viewer-bottom { display: none; }
+
+        /* ============ SPLASH SCREEN ============ */
+        #splash {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: radial-gradient(ellipse at center, #1a1410 0%, #050709 70%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px;
+            transition: opacity 0.8s ease;
+        }
+        #splash.hidden { opacity: 0; pointer-events: none; }
+
+        #splash::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 30% 70%, rgba(255, 107, 53, 0.15), transparent 50%),
+                radial-gradient(circle at 70% 30%, rgba(76, 201, 240, 0.08), transparent 50%);
+            pointer-events: none;
+        }
+
+        #splash .splash-content { position: relative; max-width: 720px; z-index: 1; }
+
+        #splash h1 {
+            font-size: clamp(2rem, 5vw, 3.4rem);
+            font-weight: 700;
+            margin: 0 0 12px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 50%, var(--accent-3) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+        #splash .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            font-weight: 400;
+        }
+        #splash .tagline {
+            font-size: 0.95rem;
+            color: var(--text-dim);
+            margin-bottom: 36px;
+            max-width: 560px;
+            line-height: 1.6;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #splash .badges {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 36px;
+            flex-wrap: wrap;
+        }
+        #splash .badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-strong);
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        #splash button {
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: #1a0f08;
+            border: none;
+            padding: 14px 36px;
+            border-radius: 999px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(255, 107, 53, 0.35);
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #splash button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(255, 107, 53, 0.5);
+        }
+        #splash .credits {
+            margin-top: 32px;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            opacity: 0.7;
+        }
+
+        /* ============ TOP BAR ============ */
+        #topbar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: var(--bg-1);
+            backdrop-filter: blur(24px) saturate(140%);
+            -webkit-backdrop-filter: blur(24px) saturate(140%);
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px -10px rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 10;
+            gap: 16px;
+        }
+        #topbar .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        #topbar .logo .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 12px var(--accent);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.15); }
+        }
+        #topbar .divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border-strong);
+        }
+        #topbar .breadcrumb {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+        #topbar .spacer { flex: 1; }
+        #topbar .actions { display: flex; gap: 8px; }
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+        .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--border-strong);
+        }
+        .icon-btn.active {
+            background: rgba(255, 107, 53, 0.15);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .icon-btn i { width: 18px; height: 18px; }
+
+        /* ============ SIDE PANEL ============ */
+        #sidepanel {
+            position: absolute;
+            top: 72px;
+            left: 16px;
+            width: 340px;
+            max-height: calc(100vh - 160px);
+            background: var(--glass-sheen), var(--bg-2);
+            backdrop-filter: blur(28px) saturate(150%);
+            -webkit-backdrop-filter: blur(28px) saturate(150%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05);
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.35s ease;
+        }
+        #sidepanel.collapsed {
+            transform: translateX(-360px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.2);
+        }
+        .tab {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            padding: 12px 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.15s;
+        }
+        .tab i { width: 16px; height: 16px; }
+        .tab:hover { color: var(--text); }
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+            background: linear-gradient(180deg, rgba(255,107,53,0.12), rgba(255,107,53,0.02));
+        }
+        .tab.active i { filter: drop-shadow(0 0 6px rgba(255,107,53,0.55)); }
+
+        .tab-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 18px;
+        }
+        .tab-content::-webkit-scrollbar { width: 6px; }
+        .tab-content::-webkit-scrollbar-thumb {
+            background: var(--border-strong);
+            border-radius: 3px;
+        }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+
+        .section {
+            margin-bottom: 22px;
+        }
+        .section-title {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            margin: 0 0 10px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .section-title i { width: 12px; height: 12px; }
+
+        /* Layer toggle row */
+        .layer-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.025);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            margin-bottom: 6px;
+            transition: background 0.15s;
+        }
+        .layer-row:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--border-strong); }
+        .layer-row .label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.88rem;
+        }
+        .layer-row .label .color-chip {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            background: var(--accent);
+            flex-shrink: 0;
+        }
+        .layer-row .label i { width: 16px; height: 16px; color: var(--text-dim); }
+
+        /* Switch */
+        .switch { position: relative; width: 36px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 999px;
+            transition: 0.2s;
+            cursor: pointer;
+        }
+        .switch .slider::before {
+            content: '';
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            left: 3px;
+            top: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.2s;
+        }
+        .switch input:checked + .slider {
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            box-shadow: 0 0 10px rgba(255,107,53,0.45);
+        }
+        .switch input:checked + .slider::before {
+            transform: translateX(16px);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+
+        /* Sliders */
+        .control-group { margin-top: 10px; padding: 0 4px; }
+        .control-group .control-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+        }
+        .control-group .control-label .value {
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.15);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+        input[type="range"]:disabled::-webkit-slider-thumb {
+            background: var(--text-dim);
+            box-shadow: none;
+        }
+
+        /* Buttons */
+        .btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            padding: 8px 14px;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.15s;
+        }
+        .btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--border-strong);
+            transform: translateY(-1px);
+        }
+        .btn:active:not(:disabled) { transform: translateY(0); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn i { width: 14px; height: 14px; }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #ff8855);
+            border: none;
+            color: #1a0f08;
+            font-weight: 600;
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4); }
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #d63d63);
+            border: none;
+            color: white;
+            font-weight: 600;
+        }
+        .btn-block { width: 100%; justify-content: center; }
+
+        /* Camera shortcuts */
+        .shortcut-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+        .shortcut-grid .btn { font-size: 0.78rem; padding: 8px 10px; justify-content: flex-start; }
+
+        /* About cards */
+        .info-card {
+            background: rgba(255, 255, 255, 0.025);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            line-height: 1.55;
+            color: var(--text-dim);
+        }
+        .info-card strong { color: var(--text); }
+        .info-card .stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px dashed var(--border);
+        }
+        .info-card .stat:last-child { border-bottom: none; }
+        .info-card .stat .num { font-family: 'JetBrains Mono', monospace; color: var(--accent-2); }
+
+        /* ============ BOTTOM TIMELINE PLACEHOLDER ============ */
+        #timeline-bar {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-2);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 12px 18px;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 520px;
+        }
+        #timeline-bar .clock {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--accent-2);
+            min-width: 150px;
+        }
+        #timeline-bar .clock .date { color: var(--text-dim); font-size: 0.72rem; display: block; }
+        #timeline-bar .scrub {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #timeline-bar .scrub input[type="range"] { flex: 1; }
+        #timeline-bar .play-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            color: #1a0f08;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+        }
+        #timeline-bar .play-btn:hover { transform: scale(1.05); }
+        #timeline-bar .play-btn i { width: 18px; height: 18px; }
+
+        /* ============ LOADING ============ */
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 500;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+        #loading.visible { display: flex; }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 107, 53, 0.15);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ============ TOAST ============ */
+        #toast-container {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .toast {
+            background: var(--bg-2);
+            border: 1px solid var(--border-strong);
+            border-left: 3px solid var(--accent);
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow);
+            font-size: 0.85rem;
+            max-width: 320px;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Measurement / profile panel */
+        .measure-panel {
+            position: absolute;
+            bottom: 80px;
+            right: 16px;
+            z-index: 30;
+            background: rgba(20, 20, 35, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            padding: 10px 12px 12px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+            color: #e6e6f0;
+            font-family: 'Inter', sans-serif;
+        }
+        .measure-panel-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .measure-panel-close {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 1.1rem;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0 2px;
+        }
+        .measure-panel-close:hover { color: #fff; }
+        .measure-panel-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px 12px;
+            font-size: 0.72rem;
+            color: #b8b8c8;
+            margin-top: 6px;
+        }
+        .measure-panel-stats b { color: #4cc9f0; }
+
+        /* ============ CESIUM LOGO BADGE ============ */
+        #cesium-badge {
+            position: absolute;
+            bottom: 16px;
+            right: 16px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            background: rgba(18, 22, 32, 0.78);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            border-radius: 999px;
+            padding: 5px 12px 5px 8px;
+            text-decoration: none;
+            color: #c8cdd8;
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+            user-select: none;
+        }
+        #cesium-badge:hover {
+            background: rgba(30, 38, 55, 0.92);
+            border-color: rgba(255, 255, 255, 0.22);
+            color: #fff;
+        }
+        #cesium-badge img {
+            height: 20px;
+            width: auto;
+            display: block;
+            filter: brightness(1.15);
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            #sidepanel { width: calc(100vw - 32px); }
+            #timeline-bar { min-width: 0; width: calc(100vw - 32px); }
+            .measure-panel { right: 8px; bottom: 76px; }
+            #cesium-badge { right: 8px; bottom: 72px; }
         }
     </style>
 </head>
 
 <body>
-<div id="cesiumContainer" style="width: 100%; height: 100%;"></div>
-<div id="toolbar">
-    
-    <div id="zoomButtons"></div>
-    <div class="demo-container">
-        <div>
-            <label><input type="checkbox" data-bind="checked: enableContour"> Enable Contour Lines</label>
+
+<!-- SPLASH SCREEN -->
+<div id="splash">
+    <div class="splash-content">
+        <div class="badges">
+            <span class="badge">3D / 4D VISUALIZATION</span>
+            <span class="badge">CESIUMJS</span>
+            <span class="badge" data-i18n="splash_badge_masters">MASTER'S PROJECT</span>
         </div>
-        <div>
-            Spacing
-            <input style="width: 136px" type="range" min="1.0" max="500.0" step="1.0" data-bind="value: contourSpacing, valueUpdate: 'input', enable: enableContour">
-            <span data-bind="text: contourSpacing"></span>m
-        </div>
-        <div>
-            Line Width
-            <input style="width: 125px" type="range" min="1.0" max="10.0" step="1.0" data-bind="value: contourWidth, valueUpdate: 'input', enable: enableContour">
-            <span data-bind="text: contourWidth"></span>px
-        </div>
-        <div>
-            <button type="button" data-bind="click: changeColor, enable: enableContour">Change contour color</button>
-        </div>
+        <h1 data-i18n="splash_title">Reliving Nevado del Ruiz</h1>
+        <p class="subtitle" data-i18n="splash_subtitle">3D/4D Geovisor · Manizales, Colombia</p>
+        <p class="tagline" data-i18n="splash_tagline">
+            An interactive visualization of the geography, volcanic risk, and historical memory of the region. Explore the terrain, activate geoscientific layers, and simulate eruptive scenarios in a 4D timeline.
+        </p>
+        <button id="splash-start">
+            <i data-lucide="play"></i>
+            <span data-i18n="splash_start_btn">Start Geovisor</span>
+        </button>
+        <p class="credits" data-i18n="splash_credits">
+            Sources: Cesium Ion · OSM Buildings · SGC (Colombian Geological Service)
+        </p>
     </div>
 </div>
 
-<script src="script.js">
+<!-- CESIUM CONTAINER -->
+<div id="cesiumContainer"></div>
+
+<!-- LOADING -->
+<div id="loading">
+    <div class="spinner"></div>
+    <div id="loading-text" data-i18n="loading_text">Loading terrain and buildings…</div>
+</div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+    <div class="logo">
+        <span class="dot"></span>
+        <span data-i18n="topbar_title">Manizales Geovisor</span>
+    </div>
+    <span class="divider"></span>
+    <span class="breadcrumb" data-i18n="topbar_breadcrumb">Nevado del Ruiz · Caldas, Colombia</span>
+    <span class="spacer"></span>
+    <div class="actions">
+        <button class="icon-btn" id="btn-lang" title="Toggle Language / Cambiar Idioma" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.8rem; width: auto; padding: 0 8px;">
+            EN
+        </button>
+        <button class="icon-btn" id="btn-toggle-panel" title="Show / hide panel" data-i18n-title="tooltip_toggle_panel">
+            <i data-lucide="panel-left"></i>
+        </button>
+        <button class="icon-btn" id="btn-home" title="Initial view" data-i18n-title="tooltip_home">
+            <i data-lucide="home"></i>
+        </button>
+        <button class="icon-btn" id="btn-fullscreen" title="Fullscreen" data-i18n-title="tooltip_fullscreen">
+            <i data-lucide="maximize"></i>
+        </button>
+        <button class="icon-btn" id="btn-help" title="Help" data-i18n-title="tooltip_help">
+            <i data-lucide="help-circle"></i>
+        </button>
+    </div>
+</div>
+
+<!-- SIDE PANEL -->
+<aside id="sidepanel">
+    <div class="tabs">
+        <button class="tab active" data-tab="layers">
+            <i data-lucide="layers"></i>
+            <span data-i18n="tab_layers">Layers</span>
+        </button>
+        <button class="tab" data-tab="eruption">
+            <i data-lucide="flame"></i>
+            <span data-i18n="tab_eruption">Eruption</span>
+        </button>
+        <button class="tab" data-tab="tools">
+            <i data-lucide="ruler"></i>
+            <span data-i18n="tab_tools">Tools</span>
+        </button>
+        <button class="tab" data-tab="about">
+            <i data-lucide="info"></i>
+            <span data-i18n="tab_about">About</span>
+        </button>
+    </div>
+
+    <div class="tab-content">
+
+        <!-- ===== LAYERS TAB ===== -->
+        <div class="tab-pane active" data-pane="layers">
+            <div class="section">
+                <h4 class="section-title"><i data-lucide="mountain"></i> <span data-i18n="sec_terrain">Terrain</span></h4>
+
+                <div class="layer-row">
+                    <div class="label">
+                        <span class="color-chip" style="background: #ef476f;"></span>
+                        <span data-i18n="layer_contours">Elevation contours</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" data-bind="checked: enableContour">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span data-i18n="contour_interval">Interval</span>
+                        <span class="value"><span data-bind="text: contourSpacing"></span> m</span>
+                    </div>
+                    <input type="range" min="1.0" max="500.0" step="1.0"
+                           data-bind="value: contourSpacing, valueUpdate: 'input', enable: enableContour">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span data-i18n="contour_thickness">Line thickness</span>
+                        <span class="value"><span data-bind="text: contourWidth"></span> px</span>
+                    </div>
+                    <input type="range" min="1.0" max="10.0" step="1.0"
+                           data-bind="value: contourWidth, valueUpdate: 'input', enable: enableContour">
+                </div>
+
+                <div class="control-group">
+                    <button class="btn btn-block" data-bind="click: changeColor, enable: enableContour">
+                        <i data-lucide="palette"></i>
+                        <span data-i18n="btn_change_contour_color">Change contour color</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h4 class="section-title"><i data-lucide="map"></i> <span data-i18n="sec_basemaps">Base maps & overlays</span></h4>
+
+                <div class="layer-row">
+                    <div class="label">
+                        <i data-lucide="building-2"></i>
+                        <span data-i18n="layer_buildings">3D Buildings (OSM)</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-buildings" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="layer-row">
+                    <div class="label">
+                        <span class="color-chip" style="background: #ff6b35;"></span>
+                        <span><strong data-i18n="layer_hazard">Volcanic Hazard (SGC)</strong></span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-hazard">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-dim); margin: 4px 0 8px 4px;" data-i18n="hazard_attribution">
+                    Official SGC Map 2015 · Nevado del Ruiz Volcano
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== ERUPTION TAB ===== -->
+        <div class="tab-pane" data-pane="eruption">
+            <div class="section">
+                <h4 class="section-title"><i data-lucide="flame"></i> <span data-i18n="sec_eruptive_scenario">Eruptive scenario</span></h4>
+                <div class="info-card" data-i18n="eruptive_scenario_desc">
+                    Educational visualization of a <strong>hypothetical lahar</strong>, inspired by the November 13, 1985 event (Nevado del Ruiz · VEI 3 · Armero Tragedy). It is not an exact reconstruction of that lahar.
+                </div>
+
+                <div class="layer-row">
+                    <div class="label">
+                        <i data-lucide="wind"></i>
+                        <span data-i18n="layer_smoke">Eruptive column (smoke)</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-smoke" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="layer-row">
+                    <div class="label">
+                        <span class="color-chip" style="background: #d62828;"></span>
+                        <span data-i18n="layer_cdp">Pyroclastic flows, lava & debris (CDP)</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-cdp">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="layer-row">
+                    <div class="label">
+                        <span class="color-chip" style="background: #8b95a7;"></span>
+                        <span data-i18n="layer_ash">Ash fall</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-ash">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="layer-row">
+                    <div class="label">
+                        <span class="color-chip" style="background: #6b3410;"></span>
+                        <span data-i18n="layer_lahars">Lahars (mudflow)</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-lahar">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="layer-row">
+                    <div class="label">
+                        <span class="color-chip" style="background: #a05a2c;"></span>
+                        <span data-i18n="layer_lahar_path">Lahar trajectory</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-lahar-path">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h4 class="section-title"><i data-lucide="zap"></i> <span data-i18n="sec_trigger_event">Trigger event</span></h4>
+                <button class="btn btn-primary btn-block" id="btn-trigger-eruption">
+                    <i data-lucide="flame"></i>
+                    <span data-i18n="btn_start_eruption">Start eruption</span>
+                </button>
+                <button class="btn btn-block" id="btn-reset-eruption" style="margin-top: 6px;">
+                    <i data-lucide="rotate-ccw"></i>
+                    <span data-i18n="btn_reset">Reset</span>
+                </button>
+            </div>
+
+            <div class="section">
+                <h4 class="section-title"><i data-lucide="activity"></i> <span data-i18n="sec_lahar_status">Lahar status</span></h4>
+                <div class="info-card" style="padding: 10px 14px;">
+                    <div class="stat">
+                        <span><i data-lucide="clock" style="width:12px;height:12px;vertical-align:middle"></i> <span data-i18n="hud_elapsed_time">Elapsed time</span></span>
+                        <span class="num" id="hud-time">00:00</span>
+                    </div>
+                    <div class="stat">
+                        <span><i data-lucide="route" style="width:12px;height:12px;vertical-align:middle"></i> <span data-i18n="hud_distance">Distance covered</span></span>
+                        <span class="num" id="hud-dist">0.00 km</span>
+                    </div>
+                    <div class="stat">
+                        <span><i data-lucide="gauge" style="width:12px;height:12px;vertical-align:middle"></i> <span data-i18n="hud_velocity">Local velocity</span></span>
+                        <span class="num" id="hud-vel">0 km/h</span>
+                    </div>
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 6px; line-height: 1.5;" data-i18n="hud_model_desc">
+                    Model: <strong>v = clamp(5 + 40·tan(α), 5, 18) m/s</strong>, where α is local downhill slope. Calibrated with Armero lahar data (1985).
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== TOOLS TAB ===== -->
+        <div class="tab-pane" data-pane="tools">
+            <div class="section">
+                <h4 class="section-title"><i data-lucide="camera"></i> <span data-i18n="sec_quick_views">Quick views</span></h4>
+                <div class="shortcut-grid">
+                    <button class="btn" data-flyto="manizales">
+                        <i data-lucide="building"></i> <span data-i18n="view_manizales">Manizales</span>
+                    </button>
+                    <button class="btn" data-flyto="ruiz">
+                        <i data-lucide="mountain-snow"></i> <span data-i18n="view_ruiz">Nevado del Ruiz</span>
+                    </button>
+                    <button class="btn" data-flyto="overview">
+                        <i data-lucide="globe"></i> <span data-i18n="view_overview">General view</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h4 class="section-title"><i data-lucide="ruler"></i> <span data-i18n="sec_gis_analysis">GIS analysis</span></h4>
+                <button class="btn btn-block" id="btn-measure-distance" style="margin-bottom: 6px;">
+                    <i data-lucide="move-diagonal"></i> <span data-i18n="btn_measure_distance">Measure distance</span>
+                </button>
+                <button class="btn btn-block" id="btn-measure-area" style="margin-bottom: 6px;">
+                    <i data-lucide="square-dashed"></i> <span data-i18n="btn_measure_area">Measure area</span>
+                </button>
+                <button class="btn btn-block" id="btn-elevation-profile" style="margin-bottom: 6px;">
+                    <i data-lucide="trending-up"></i> <span data-i18n="btn_elevation_profile">Elevation profile</span>
+                </button>
+                <button class="btn btn-block" id="btn-load-geojson" style="margin-bottom: 6px;">
+                    <i data-lucide="upload"></i> <span data-i18n="btn_load_geojson">Load GeoJSON / KML</span>
+                </button>
+                <button class="btn btn-block" id="btn-clear-measure">
+                    <i data-lucide="eraser"></i> <span data-i18n="btn_clear_measure">Clear measurements</span>
+                </button>
+                <input type="file" id="file-geojson" accept=".geojson,.json,.kml,.kmz" style="display:none;">
+                <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 8px;" data-i18n="gis_analysis_hint">
+                    Left-click to add points · double-click or right-click to finish.
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== ABOUT TAB ===== -->
+        <div class="tab-pane" data-pane="about">
+            <div class="section">
+                <h4 class="section-title"><i data-lucide="info"></i> <span data-i18n="sec_about_project">About the project</span></h4>
+                <div class="info-card" data-i18n="about_project_desc">
+                    This geovisor demonstrates the use of <strong>CesiumJS</strong> as an open-source tool for <strong>SIG/GIS</strong> professionals to publish their results in a <strong>3D, interactive, and geodesically correct</strong> (WGS84 globe) manner on the web — without expensive proprietary software.
+                </div>
+            </div>
+
+            <div class="section">
+                <h4 class="section-title"><i data-lucide="mountain-snow"></i> <span data-i18n="sec_ruiz_info">Nevado del Ruiz Volcano</span></h4>
+                <div class="info-card">
+                    <div class="stat"><span data-i18n="stat_altitude">Altitude</span><span class="num">5,321 m</span></div>
+                    <div class="stat"><span data-i18n="stat_type">Type</span><span class="num" data-i18n="stat_type_val">Stratovolcano</span></div>
+                    <div class="stat"><span data-i18n="stat_last_eruption">Last major eruption</span><span class="num">1985</span></div>
+                    <div class="stat"><span>VEI 1985</span><span class="num">3</span></div>
+                    <div class="stat"><span data-i18n="stat_casualties">Armero casualties</span><span class="num">~25,000</span></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h4 class="section-title"><i data-lucide="book-open"></i> <span data-i18n="sec_sources">Sources</span></h4>
+                <div class="info-card" data-i18n="sources_desc">
+                    · Cesium Ion · DTM Terrain<br>
+                    · OpenStreetMap · 3D Buildings<br>
+                    · SGC · Volcanic hazard map<br>
+                    · IDEAM · Water network<br>
+                    · USGS · Historical data
+                </div>
+            </div>
+
+            <div class="section">
+                <h4 class="section-title"><i data-lucide="alert-triangle"></i> <span data-i18n="sec_disclaimer">Disclaimer</span></h4>
+                <div class="info-card" data-i18n="disclaimer_desc">
+                    Visualization for <strong>educational</strong> purposes only. It does not constitute an operational forecast or an official evacuation map. For official information, consult the <strong>Colombian Geological Service (SGC)</strong>.
+                </div>
+            </div>
+        </div>
+    </div>
+</aside>
+
+<!-- BOTTOM TIMELINE -->
+<div id="timeline-bar">
+    <div class="clock">
+        <span class="date" id="tl-date">— — — —</span>
+        <span id="tl-time">--:--:--</span>
+    </div>
+    <button class="play-btn" id="tl-play" title="Play/pause time" data-i18n-title="tooltip_play">
+        <i data-lucide="play"></i>
+    </button>
+    <div class="scrub">
+        <input type="range" id="tl-scrub" min="0" max="100" value="0" disabled>
+    </div>
+    <button class="icon-btn" id="tl-speed" title="Speed" data-i18n-title="tooltip_speed" style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; width: auto; padding: 0 10px;">
+        1×
+    </button>
+</div>
+
+<!-- CESIUM LOGO BADGE -->
+<a id="cesium-badge" href="https://cesium.com" target="_blank" rel="noopener" title="Built with CesiumJS">
+    <!-- Cesium ion logo (official SVG mark) -->
+    <svg id="cesium-logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" height="22" width="22" aria-hidden="true">
+        <circle cx="50" cy="50" r="50" fill="#6CADDF"/>
+        <path d="M50 18 C32 18 18 32 18 50 C18 68 32 82 50 82 C60 82 69 77 75 70 L65 60 C61 65 56 68 50 68 C39 68 30 59 30 50 C30 41 39 32 50 32 C56 32 61 35 65 40 L75 30 C69 23 60 18 50 18Z" fill="white"/>
+    </svg>
+    <span>Powered by CesiumJS</span>
+</a>
+
+<!-- TOASTS -->
+<div id="toast-container"></div>
+
+<script src="script.js"></script>
+<script>
+    // Initialize Lucide icons after DOM ready
+    if (window.lucide) lucide.createIcons();
 </script>
 </body>
 </html>
